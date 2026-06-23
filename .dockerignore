@@ -1,0 +1,27 @@
+# Dépôt Git (inutile dans l'image, très volumineux)
+.git/
+.github/
+
+# Fichiers compilés Python (régénérés automatiquement)
+__pycache__/
+*.pyc
+*.pyo
+
+# Artefacts de tests et de couverture
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# Environnement virtuel local
+.venv/
+venv/
+
+# Secrets et fichiers d'environnement locaux
+.env
+.env.*
+
+# Fichiers Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl

@@ -1,0 +1,27 @@
+from fastapi.testclient import TestClient
+from src.main import app
+
+client = TestClient(app)
+
+
+def test_health():
+    """Vérifie que l'endpoint /health répond avec status 200."""
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
+def test_predict_positive():
+    """Vérifie qu'une prédiction retourne la bonne structure de réponse."""
+    r = client.post("/predict", json={"text": "Ce produit est excellent !"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["label"] in ["POSITIVE", "NEGATIVE", "NEUTRAL"]
+    assert 0 <= data["score"] <= 1
+    assert "text" in data
+
+
+def test_predict_empty_fails():
+    """Vérifie que Pydantic rejette un texte vide avec une erreur 422."""
+    r = client.post("/predict", json={"text": ""})
+    assert r.status_code == 422
