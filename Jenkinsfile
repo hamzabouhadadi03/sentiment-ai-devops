@@ -47,6 +47,7 @@ pipeline {
                 sh """
                     docker run --rm \
                         --volumes-from jenkins \
+                        --user \$(id -u):\$(id -g) \
                         -w \$WORKSPACE \
                         ${IMAGE_NAME}:${IMAGE_TAG} \
                         pytest tests/ -v \
