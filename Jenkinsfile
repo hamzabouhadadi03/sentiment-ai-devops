@@ -9,7 +9,7 @@ pipeline {
         IMAGE_NAME   = 'sentiment-ai'
         REGISTRY     = 'ghcr.io/hamzabouhadadi03'
         IMAGE_TAG    = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        SONAR_URL    = 'http://sonarqube:9000'
+        SONAR_URL    = 'http://host.docker.internal:9000'
         TRIVY_REPORT = 'trivy-report.json'
     }
 
@@ -68,7 +68,7 @@ pipeline {
             steps {
                 sh """
                     docker run --rm \
-                        --network cicd-network \
+                        --add-host=host.docker.internal:host-gateway \
                         --volumes-from jenkins \
                         -w \$WORKSPACE \
                         -e SONAR_HOST_URL=${SONAR_URL} \
@@ -90,8 +90,8 @@ pipeline {
                 sh """
                     STATUS=""
                     for i in \$(seq 1 10); do
-                        STATUS=\$(curl -s -u admin:Admin2024!!! \
-                            "${SONAR_URL}/api/qualitygates/project_status?projectKey=${IMAGE_NAME}" \
+                        STATUS=\$(curl -s -u "admin:Admin2024!!!" \
+                            "http://host.docker.internal:9000/api/qualitygates/project_status?projectKey=${IMAGE_NAME}" \
                             | python3 -c "import sys,json; print(json.load(sys.stdin)['projectStatus']['status'])")
                         echo "Quality Gate status: \$STATUS"
                         if [ "\$STATUS" = "OK" ] || [ "\$STATUS" = "ERROR" ]; then
@@ -186,7 +186,6 @@ pipeline {
     post {
         always {
             sh 'docker compose down -v 2>/dev/null || true'
-            deleteDir()
         }
         success {
             echo "Pipeline réussi ! Image poussée : ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
