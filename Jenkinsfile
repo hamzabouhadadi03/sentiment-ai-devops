@@ -66,31 +66,45 @@ pipeline {
         // ── 4. Analyse SonarQube ─────────────────────────────────────────────
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh """
-                        docker run --rm \
-                            --network cicd-network \
-                            --volumes-from jenkins \
-                            -w \$WORKSPACE \
-                            -e SONAR_HOST_URL=${SONAR_URL} \
-                            sonarsource/sonar-scanner-cli:latest \
-                            sonar-scanner \
-                                -Dsonar.projectKey=${IMAGE_NAME} \
-                                -Dsonar.sources=src \
-                                -Dsonar.tests=tests \
-                                -Dsonar.python.coverage.reportPaths=coverage.xml \
-                                -Dsonar.projectVersion=${IMAGE_TAG}
-                    """
-                }
+                sh """
+                    docker run --rm \
+                        --network cicd-network \
+                        --volumes-from jenkins \
+                        -w \$WORKSPACE \
+                        -e SONAR_HOST_URL=${SONAR_URL} \
+                        -e SONAR_TOKEN=sqa_6320665c5283b5a4a1a3346fc31ccd7f958fcc8b \
+                        sonarsource/sonar-scanner-cli:latest \
+                        sonar-scanner \
+                            -Dsonar.projectKey=${IMAGE_NAME} \
+                            -Dsonar.sources=src \
+                            -Dsonar.tests=tests \
+                            -Dsonar.python.coverage.reportPaths=coverage.xml \
+                            -Dsonar.projectVersion=${IMAGE_TAG}
+                """
             }
         }
 
         // ── 5. Vérification du Quality Gate ─────────────────────────────────
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+                sh """
+                    STATUS=""
+                    for i in \$(seq 1 10); do
+                        STATUS=\$(curl -s -u admin:Admin2024!!! \
+                            "${SONAR_URL}/api/qualitygates/project_status?projectKey=${IMAGE_NAME}" \
+                            | python3 -c "import sys,json; print(json.load(sys.stdin)['projectStatus']['status'])")
+                        echo "Quality Gate status: \$STATUS"
+                        if [ "\$STATUS" = "OK" ] || [ "\$STATUS" = "ERROR" ]; then
+                            break
+                        fi
+                        sleep 15
+                    done
+                    if [ "\$STATUS" != "OK" ]; then
+                        echo "Quality Gate échoué (\$STATUS) — pipeline bloqué."
+                        exit 1
+                    fi
+                    echo "Quality Gate PASSED"
+                """
             }
             post {
                 failure {
@@ -172,7 +186,7 @@ pipeline {
     post {
         always {
             sh 'docker compose down -v 2>/dev/null || true'
-            cleanWs()
+            deleteDir()
         }
         success {
             echo "Pipeline réussi ! Image poussée : ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
