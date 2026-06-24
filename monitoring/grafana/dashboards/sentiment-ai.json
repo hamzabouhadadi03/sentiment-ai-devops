@@ -13,7 +13,7 @@
       "title": "Requêtes HTTP par seconde",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "expr": "rate(http_requests_total{job=\"sentiment-ai\"}[1m])",
@@ -33,7 +33,7 @@
       "title": "Latence des requêtes (p50 / p95 / p99)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"sentiment-ai\"}[1m]))",
@@ -63,7 +63,7 @@
       "title": "Total requêtes",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "expr": "sum(http_requests_total{job=\"sentiment-ai\"})",
@@ -81,7 +81,7 @@
       "title": "Taux d'erreurs (4xx + 5xx)",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "expr": "sum(rate(http_requests_total{job=\"sentiment-ai\", status_code=~\"[45]..\"}[1m]))",
@@ -106,7 +106,7 @@
       "title": "Latence moyenne /predict",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "expr": "rate(http_request_duration_seconds_sum{job=\"sentiment-ai\", handler=\"/predict\"}[1m]) / rate(http_request_duration_seconds_count{job=\"sentiment-ai\", handler=\"/predict\"}[1m])",
@@ -128,7 +128,7 @@
       "title": "Requêtes en cours",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         {
           "expr": "sum(http_requests_inprogress{job=\"sentiment-ai\"})",
