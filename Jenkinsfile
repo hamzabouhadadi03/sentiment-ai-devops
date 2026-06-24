@@ -12,7 +12,7 @@ pipeline {
     environment {
         IMAGE_NAME   = 'sentiment-ai'
         REGISTRY     = 'ghcr.io/hamzabouhadadi03'
-        IMAGE_TAG    = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        IMAGE_TAG    = "${BUILD_NUMBER}"
         SONAR_URL    = 'http://host.docker.internal:9000'
         TRIVY_REPORT = 'trivy-report.json'
     }
@@ -26,6 +26,7 @@ pipeline {
                 checkout scm
                 echo "Branche : ${env.BRANCH_NAME}"
                 echo "Commit  : ${env.GIT_COMMIT}"
+                echo "Build   : ${BUILD_NUMBER}"
                 sh 'git log --oneline -5'
             }
         }
