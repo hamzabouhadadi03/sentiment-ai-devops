@@ -5,6 +5,10 @@
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)
+    }
+
     environment {
         IMAGE_NAME   = 'sentiment-ai'
         REGISTRY     = 'ghcr.io/hamzabouhadadi03'
@@ -18,6 +22,7 @@ pipeline {
         // ── 1. Récupération du code ──────────────────────────────────────────
         stage('Checkout') {
             steps {
+                sh 'docker run --rm --volumes-from jenkins alpine sh -c "rm -rf /var/jenkins_home/workspace/sentiment-ai-pipeline/tests/__pycache__ /var/jenkins_home/workspace/sentiment-ai-pipeline/.pytest_cache 2>/dev/null || true"'
                 checkout scm
                 echo "Branche : ${env.BRANCH_NAME}"
                 echo "Commit  : ${env.GIT_COMMIT}"
