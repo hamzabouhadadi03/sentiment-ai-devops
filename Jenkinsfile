@@ -1,18 +1,21 @@
 // Jenkinsfile - Pipeline CI/CD SentimentAI
-// Phase 8 : 4 stages - Checkout, Lint, Build & Test, Push
+// Phase 9 : 8 stages - Checkout, Lint, Build & Test, SonarQube, Quality Gate,
+//                      Trivy Scan, Push, Notify
 
 pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'sentiment-ai'
-        REGISTRY   = 'ghcr.io/hamzabouhadadi03'
-        // SHA Git court du commit - chaque build produit une image unique et traçable
-        IMAGE_TAG  = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        IMAGE_NAME   = 'sentiment-ai'
+        REGISTRY     = 'ghcr.io/hamzabouhadadi03'
+        IMAGE_TAG    = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        SONAR_URL    = 'http://sonarqube:9000'
+        TRIVY_REPORT = 'trivy-report.json'
     }
 
     stages {
 
+        // ── 1. Récupération du code ──────────────────────────────────────────
         stage('Checkout') {
             steps {
                 checkout scm
@@ -22,6 +25,7 @@ pipeline {
             }
         }
 
+        // ── 2. Analyse statique du code ──────────────────────────────────────
         stage('Lint') {
             steps {
                 sh '''
@@ -34,6 +38,7 @@ pipeline {
             }
         }
 
+        // ── 3. Build de l'image + tests unitaires + couverture ───────────────
         stage('Build & Test') {
             steps {
                 sh """
@@ -41,10 +46,13 @@ pipeline {
                 """
                 sh """
                     docker run --rm \
+                        --volumes-from jenkins \
+                        -w \$WORKSPACE \
                         ${IMAGE_NAME}:${IMAGE_TAG} \
                         pytest tests/ -v \
                             --cov=src \
                             --cov-report=term-missing \
+                            --cov-report=xml:coverage.xml \
                             --cov-fail-under=70
                 """
             }
@@ -55,6 +63,81 @@ pipeline {
             }
         }
 
+        // ── 4. Analyse SonarQube ─────────────────────────────────────────────
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh """
+                        docker run --rm \
+                            --network cicd-network \
+                            --volumes-from jenkins \
+                            -w \$WORKSPACE \
+                            -e SONAR_HOST_URL=${SONAR_URL} \
+                            sonarsource/sonar-scanner-cli:latest \
+                            sonar-scanner \
+                                -Dsonar.projectKey=${IMAGE_NAME} \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=tests \
+                                -Dsonar.python.coverage.reportPaths=coverage.xml \
+                                -Dsonar.projectVersion=${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+
+        // ── 5. Vérification du Quality Gate ─────────────────────────────────
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+            post {
+                failure {
+                    echo 'Quality Gate échoué — le pipeline est bloqué.'
+                }
+            }
+        }
+
+        // ── 6. Scan de vulnérabilités Trivy ──────────────────────────────────
+        stage('Trivy Scan') {
+            steps {
+                sh """
+                    docker run --rm \
+                        --volumes-from jenkins \
+                        -v /var/run/docker.sock:/var/run/docker.sock \
+                        -w \$WORKSPACE \
+                        aquasec/trivy:latest image \
+                            --exit-code 1 \
+                            --severity HIGH,CRITICAL \
+                            --ignore-unfixed \
+                            --format json \
+                            --output ${TRIVY_REPORT} \
+                            ${IMAGE_NAME}:${IMAGE_TAG} || true
+                """
+                // Archiver le rapport même en cas d'échec
+                archiveArtifacts artifacts: "${TRIVY_REPORT}", allowEmptyArchive: true
+                // Échouer si des vulnérabilités CRITICAL sont trouvées
+                sh """
+                    CRITICAL=\$(docker run --rm \
+                        -v \$WORKSPACE/${TRIVY_REPORT}:/report.json \
+                        aquasec/trivy:latest \
+                        --quiet convert --format table /report.json 2>/dev/null | grep -c CRITICAL || true)
+                    echo "Vulnérabilités CRITICAL : \$CRITICAL"
+                    if [ "\$CRITICAL" -gt 0 ]; then
+                        echo "Des vulnérabilités CRITICAL ont été détectées — pipeline bloqué."
+                        exit 1
+                    fi
+                """
+            }
+            post {
+                always {
+                    echo "Rapport Trivy archivé : ${TRIVY_REPORT}"
+                }
+            }
+        }
+
+        // ── 7. Push vers le registry ─────────────────────────────────────────
         stage('Push') {
             when { branch 'main' }
             steps {
@@ -75,15 +158,24 @@ pipeline {
             }
         }
 
+        // ── 8. Notification du résultat ──────────────────────────────────────
+        stage('Notify') {
+            steps {
+                echo "Pipeline terminé — Image : ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                echo "SonarQube  : ${SONAR_URL}/dashboard?id=${IMAGE_NAME}"
+                echo "Trivy      : voir artefact ${TRIVY_REPORT}"
+            }
+        }
+
     }
 
     post {
         always {
-            // Nettoyer les conteneurs de test qu'il y ait succès ou échec
             sh 'docker compose down -v 2>/dev/null || true'
+            cleanWs()
         }
         success {
-            echo "Pipeline réussi ! Image : ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Pipeline réussi ! Image poussée : ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
         }
         failure {
             echo 'Pipeline échoué. Consultez les logs ci-dessus.'

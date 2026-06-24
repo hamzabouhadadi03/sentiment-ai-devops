@@ -1,0 +1,10 @@
+docker_host    = "npipe:////./pipe/docker_engine"
+network_name   = "tf-cicd-network"
+image_name     = "sentiment-ai"
+image_tag      = "terraform"
+container_name = "tf-sentiment-ai"
+app_port       = 8081
+environment    = "staging"
+sonarqube_port = 9001
+sonar_db_user  = "sonar"
+sonar_db_name  = "sonar"
